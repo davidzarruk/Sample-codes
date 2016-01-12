@@ -1,0 +1,586 @@
+Private Sub UserForm_Initialize()
+    
+Application.ScreenUpdating = False
+
+CBMes.Value = "Todos"
+
+'Fill CityListBox
+With CBMes
+    .AddItem "Todos"
+    .AddItem "Enero"
+    .AddItem "Febrero"
+    .AddItem "Marzo"
+    .AddItem "Abril"
+    .AddItem "Mayo"
+    .AddItem "Junio"
+    .AddItem "Julio"
+    .AddItem "Agosto"
+    .AddItem "Septiembre"
+    .AddItem "Octubre"
+    .AddItem "Noviembre"
+    .AddItem "Diciembre"
+End With
+
+CBAno.Value = "Todos"
+
+'Fill CityListBox
+With CBAno
+    .AddItem "Todos"
+    .AddItem "2015"
+    .AddItem "2016"
+    .AddItem "2017"
+    .AddItem "2018"
+End With
+
+CBEstadoFactura.Value = "Todos"
+
+'Fill CityListBox
+With CBEstadoFactura
+    .AddItem "Todos"
+    .AddItem "Cancelada"
+    .AddItem "Cartera"
+    .AddItem "Anulada"
+End With
+
+End Sub
+    
+
+Private Sub CommandButton1_Click()
+        
+    Application.Run "ActualizarCartera"
+    
+    Worksheets("Consecutivo").Select
+    
+    Cells.Select
+    Selection.EntireColumn.Hidden = False
+
+    
+    Worksheets("Oculta").Visible = True
+    
+    Sheets("Oculta").Select
+    Cells.Select
+    Selection.ClearContents
+    ThisWorkbook.ActiveSheet.Cells.ClearFormats
+
+    ' Convierto mes de letras a numeros
+    Dim mes As Integer
+    
+    If CBMes.Text = "Enero" Then
+        mes = 1
+    ElseIf CBMes.Text = "Febrero" Then
+        mes = 2
+    ElseIf CBMes.Text = "Marzo" Then
+        mes = 3
+    ElseIf CBMes.Text = "Abril" Then
+        mes = 4
+    ElseIf CBMes.Text = "Mayo" Then
+        mes = 5
+    ElseIf CBMes.Text = "Junio" Then
+        mes = 6
+    ElseIf CBMes.Text = "Julio" Then
+        mes = 7
+    ElseIf CBMes.Text = "Agosto" Then
+        mes = 8
+    ElseIf CBMes.Text = "Septiembre" Then
+        mes = 9
+    ElseIf CBMes.Text = "Octubre" Then
+        mes = 10
+    ElseIf CBMes.Text = "Noviembre" Then
+        mes = 11
+    ElseIf CBMes.Text = "Diciembre" Then
+        mes = 12
+    End If
+    
+    ' Cuento cuantas entradas hay
+    Dim i As Integer
+    i = 3
+    
+    Worksheets("Consecutivo").Select
+    Range(Cells(3, 1), Cells(3, 1)).Select
+    
+    Do Until ActiveCell.Value = Empty
+        ActiveCell.Offset(1, 0).Select
+        i = i + 1
+    Loop
+    
+    i = i - 1
+    
+    ' Pongo filtros para sacar estadisticas de acuerdo a la seleccion del usuario
+    Rows("3:3").Select
+    Selection.AutoFilter
+    
+    If CBEstadoFactura.Value <> "Todos" Then
+        ActiveSheet.Range(Cells(3, 1), Cells(i, 173)).AutoFilter Field:=166, Criteria1:=CBEstadoFactura.Value
+    End If
+    
+    If CBAno.Value <> "Todos" Then
+        ActiveSheet.Range(Cells(3, 1), Cells(i, 173)).AutoFilter Field:=173, Criteria1:=CBAno.Value
+    End If
+    
+    If CBMes.Text <> "Todos" Then
+        ActiveSheet.Range(Cells(3, 1), Cells(i, 173)).AutoFilter Field:=172, Criteria1:=mes
+    End If
+    
+    
+    Range(Cells(1, 1), Cells(i, 173)).Select
+    Selection.Copy
+    
+    Sheets("Oculta").Select
+    Range("A1").Select
+    ActiveSheet.Paste
+    
+    ' Saco estadisticas, sumo por tipo, etc
+    Dim j As Integer
+    
+    For j = 4 To 165
+        i = 3
+        
+        Range(Cells(3, 1), Cells(3, 1)).Select
+        
+        Do Until ActiveCell.Value = Empty
+            ActiveCell.Offset(1, 0).Select
+            i = i + 1
+        Loop
+        
+        i = i - 1
+        
+        If i = 3 Then
+            MsgBox "No hay pedidos con ese filtro.", vbExclamation
+            Exit Sub 'Acabo aqui
+        End If
+
+        Range(Cells(4, j), Cells(i + 1, j)).Select
+        Cells(i + 1, j).Activate
+        ActiveCell.FormulaR1C1 = "=SUM(R[-" & CStr(i - 3) & "]C:R[-1]C)"
+    Next j
+    
+    Cells(4, 174).Select
+    ActiveCell.FormulaR1C1 = _
+        "=IF(OR(ISBLANK(RC[-7])=0,RC[-8]=""Cartera""),IF(DAYS360(RC[-7],TODAY())<=0,""0"",DAYS360(RC[-7],TODAY())),"""")"
+    Selection.AutoFill Destination:=Range(Cells(4, 174), Cells(i, 174))
+    
+    ' Saco estadisticas de cartera, cartera vencida y cancelada
+    Dim cart As Double
+    Dim cartvenc As Double
+    Dim canc As Double
+    
+    Range(Cells(4, 165), Cells(i + 2, 165)).Select
+    Cells(i + 2, 165).Activate
+    ActiveCell.FormulaR1C1 = _
+        "=SUMIFS(R[-" & CStr(i - 2) & "]C:R[-2]C,R[-" & CStr(i - 2) & "]C[1]:R[-2]C[1]," & Chr(34) & "Cartera" & Chr(34) & ")"
+    cart = Cells(i + 2, 165).Value
+    
+    Range(Cells(4, 165), Cells(i + 3, 165)).Select
+    Cells(i + 3, 165).Activate
+    ActiveCell.FormulaR1C1 = _
+        "=SUMIFS(R[-" & CStr(i - 1) & "]C:R[-3]C,R[-" & CStr(i - 1) & "]C[1]:R[-3]C[1]," & Chr(34) & "Cartera" & Chr(34) & ",R[-" & CStr(i - 1) & "]C[9]:R[-3]C[9]," & Chr(34) & ">0" & Chr(34) & ")"
+    cartvenc = Cells(i + 3, 165).Value
+    
+    Range(Cells(4, 165), Cells(i + 3, 165)).Select
+    Cells(i + 4, 165).Activate
+    ActiveCell.FormulaR1C1 = _
+        "=SUMIFS(R[-" & CStr(i) & "]C:R[-4]C,R[-" & CStr(i) & "]C[1]:R[-4]C[1]," & Chr(34) & "Cancelada" & Chr(34) & ")"
+    canc = Cells(i + 4, 165).Value
+    
+    ' Saco precios y kilos vendidos
+    Dim PrecioPromedioFruta(1 To 17 * 3 + 1) As Double
+    Dim TotalKilosFruta(1 To 17 * 3 + 1) As Double
+    Dim TotalValorFruta(1 To 17 * 3 + 1) As Double
+
+    ' Estadisticas de la fruta
+    For j = 2 To 17 * 3 + 2
+        If Cells(i + 1, 3 * j - 2) <> 0 Then
+            PrecioPromedioFruta(j - 1) = Cells(i + 1, 3 * j) / Cells(i + 1, 3 * j - 2)
+        End If
+        TotalKilosFruta(j - 1) = Cells(i + 1, 3 * j - 2)
+        TotalValorFruta(j - 1) = Cells(i + 1, 3 * j)
+    Next j
+    
+    Dim IVA As Double
+    IVA = Cells(i + 1, 164)
+    Dim descuento As Double
+    descuento = Cells(i + 1, 161) - Cells(i + 1, 163)
+
+    ' Pongo todo en formato lindo
+    Sheets("Reporte automatico").Select
+    
+    Dim prov As Double
+    Dim prov2 As Double
+    prov = 0
+    prov2 = 0
+    
+    For j = 1 To 17
+        If j = 1 Then
+            Cells(j + 4, 1) = "Curuba"
+        ElseIf j = 2 Then
+            Cells(j + 4, 1) = "Feijoa"
+        ElseIf j = 3 Then
+            Cells(j + 4, 1) = "Fresa"
+        ElseIf j = 4 Then
+            Cells(j + 4, 1) = "Guanabana"
+        ElseIf j = 5 Then
+            Cells(j + 4, 1) = "Guayaba"
+        ElseIf j = 6 Then
+            Cells(j + 4, 1) = "Lulo"
+        ElseIf j = 7 Then
+            Cells(j + 4, 1) = "Mandarina"
+        ElseIf j = 8 Then
+            Cells(j + 4, 1) = "Mango"
+        ElseIf j = 9 Then
+            Cells(j + 4, 1) = "Maracuya"
+        ElseIf j = 10 Then
+            Cells(j + 4, 1) = "Mora"
+        ElseIf j = 11 Then
+            Cells(j + 4, 1) = "Naranja"
+        ElseIf j = 12 Then
+            Cells(j + 4, 1) = "Pina"
+        ElseIf j = 13 Then
+            Cells(j + 4, 1) = "Tomate de arbol"
+        ElseIf j = 14 Then
+            Cells(j + 4, 1) = "Uva"
+        ElseIf j = 15 Then
+            Cells(j + 4, 1) = "Fruta 15"
+        ElseIf j = 16 Then
+            Cells(j + 4, 1) = "Fruta 16"
+        ElseIf j = 17 Then
+            Cells(j + 4, 1) = "Fruta 17"
+        ElseIf j = 18 Then
+            Cells(j + 4, 1) = "Jugos"
+        End If
+        
+        For kk = 1 To 3
+            If kk = 3 Then
+                Cells(j + 4, kk + 4) = TotalKilosFruta(3 * (j - 1) + kk) / 4
+                prov2 = prov2 + TotalKilosFruta(3 * (j - 1) + kk) / 4
+            Else
+                Cells(j + 4, kk + 4) = TotalKilosFruta(3 * (j - 1) + kk)
+                prov2 = prov2 + TotalKilosFruta(3 * (j - 1) + kk)
+            End If
+            prov = prov + TotalValorFruta(3 * (j - 1) + kk)
+            
+            If kk = 3 Then
+                Cells(j + 4, 2) = prov
+                Cells(j + 4, 4) = prov2
+                prov = 0
+                prov2 = 0
+            End If
+        Next kk
+        
+    Next j
+    
+    Cells(23, 2) = TotalValorFruta(3 * 17 + 1)
+    Cells(23, 4) = TotalKilosFruta(3 * 17 + 1)
+    
+    ' Saco totales
+    prov = 0
+    Dim cien As Double
+    Dim kilo As Double
+    Dim dosc As Double
+    
+    For j = 1 To 17
+        prov = Cells(j + 4, 5).Value + Cells(j + 4, 6).Value + Cells(j + 4, 7).Value
+        kilo = kilo + Cells(j + 4, 5).Value
+        cien = cien + Cells(j + 4, 6).Value
+        dosc = dosc + Cells(j + 4, 7).Value
+        
+        If prov <> 0 Then
+            Cells(j + 4, 5).Value = Cells(j + 4, 5).Value / prov
+            Cells(j + 4, 6).Value = Cells(j + 4, 6).Value / prov
+            Cells(j + 4, 7).Value = (Cells(j + 4, 7).Value) / prov
+        End If
+        prov = 0
+    Next j
+    
+    If (kilo + cien + dosc) <> 0 Then
+        Cells(22, 5).Value = kilo / (kilo + cien + dosc)
+        Cells(22, 6).Value = cien / (kilo + cien + dosc)
+        Cells(22, 7).Value = dosc / (kilo + cien + dosc)
+    End If
+    
+    Cells(25, 2).Value = descuento
+    Cells(26, 2).Value = IVA
+    
+    Cells(8, 12).Value = cart
+    Cells(9, 12).Value = cartvenc
+    Cells(10, 12).Value = canc
+    
+    Range("A5:H21").Select
+    Application.CutCopyMode = False
+    ActiveWorkbook.Worksheets("Reporte automatico").Sort.SortFields.Clear
+    ActiveWorkbook.Worksheets("Reporte automatico").Sort.SortFields.Add Key:= _
+        Range("B5:B21"), SortOn:=xlSortOnValues, Order:=xlDescending, DataOption:= _
+        xlSortNormal
+    With ActiveWorkbook.Worksheets("Reporte automatico").Sort
+        .SetRange Range("A5:H21")
+        .Header = xlGuess
+        .MatchCase = False
+        .Orientation = xlTopToBottom
+        .SortMethod = xlPinYin
+        .Apply
+    End With
+    
+
+    
+    ' Ahora miro clientes mas grandes
+    Sheets("Clientes").Select
+    i = 3
+    
+    Range(Cells(3, 1), Cells(3, 1)).Select
+    Do Until ActiveCell.Value = Empty
+        ActiveCell.Offset(1, 0).Select
+        i = i + 1
+    Loop
+    
+    i = i - 1
+    
+    Dim Clientes() As String
+    ReDim Clientes(i - 2)
+    Dim numclientes As Integer
+    numclientes = i - 2
+
+    For ll = 3 To i
+        Clientes(ll - 2) = Cells(ll, 1).Value
+    Next ll
+    
+    Sheets("Oculta").Select
+    Range(Cells(3, 1), Cells(3, 1)).Select
+    
+    i = 3
+    
+    Do Until ActiveCell.Value = Empty
+        ActiveCell.Offset(1, 0).Select
+        i = i + 1
+    Loop
+    
+    i = i - 1
+    
+    Dim totales() As Long
+    Dim totalescart() As Long
+    Dim totalescartven() As Long
+    Dim totalescanc() As Long
+    ReDim totales(numclientes)
+    ReDim totalescart(numclientes)
+    ReDim totalescartven(numclientes)
+    ReDim totalescanc(numclientes)
+    
+    For ww = 1 To numclientes
+        For ll = 3 To i
+            If Cells(ll, 2).Value = Clientes(ww) Then
+                totales(ww) = totales(ww) + Val(Cells(ll, 165).Value)
+            End If
+            If Cells(ll, 2).Value = Clientes(ww) And Cells(ll, 166).Value = "Cartera" Then
+                totalescart(ww) = totalescart(ww) + Val(Cells(ll, 165).Value)
+            End If
+            If Cells(ll, 2).Value = Clientes(ww) And Cells(ll, 166).Value = "Cartera" And Cells(ll, 174).Value > 0 Then
+                totalescartven(ww) = totalescartven(ww) + Val(Cells(ll, 165).Value)
+            End If
+            If Cells(ll, 2).Value = Clientes(ww) And Cells(ll, 166).Value = "Cancelada" Then
+                totalescanc(ww) = totalescanc(ww) + Val(Cells(ll, 165).Value)
+            End If
+        Next ll
+    Next ww
+    
+    Sheets("Reporte automatico").Select
+    
+    For ww = 1 To numclientes
+        Cells(33 + ww, 1).Value = Clientes(ww)
+        Cells(33 + ww, 11).Value = Clientes(ww)
+        Cells(33 + ww, 2).Value = totales(ww)
+        Cells(33 + ww, 4).Value = totalescart(ww)
+        Cells(33 + ww, 5).Value = totalescartven(ww)
+        Cells(33 + ww, 12).Value = totalescartven(ww)
+        Cells(33 + ww, 6).Value = totalescanc(ww)
+    Next ww
+    
+    For ww = 1 To numclientes
+        If Cells(27, 2).Value <> 0 Then
+            Cells(33 + ww, 3).Value = totales(ww) / Cells(27, 2).Value
+        End If
+        If Cells(9, 12).Value <> 0 Then
+            Cells(33 + ww, 13).Value = totalescartven(ww) / Cells(9, 12).Value
+        End If
+    Next ww
+    
+    Range(Cells(33, 1), Cells(33 + numclientes, 6)).Select
+    ActiveWorkbook.Worksheets("Reporte automatico").Sort.SortFields.Clear
+    ActiveWorkbook.Worksheets("Reporte automatico").Sort.SortFields.Add Key:= _
+        Range(Cells(34, 2), Cells(33 + numclientes, 2)), SortOn:=xlSortOnValues, Order:=xlDescending, DataOption _
+        :=xlSortNormal
+    With ActiveWorkbook.Worksheets("Reporte automatico").Sort
+        .SetRange Range(Cells(33, 1), Cells(33 + numclientes, 6))
+        .Header = xlYes
+        .MatchCase = False
+        .Orientation = xlTopToBottom
+        .SortMethod = xlPinYin
+        .Apply
+    End With
+    
+    Range(Cells(33 + 17, 1), Cells(33 + numclientes, 6)).Select
+    Selection.ClearContents
+    
+    
+    Range(Cells(33, 11), Cells(33 + numclientes, 13)).Select
+    ActiveWorkbook.Worksheets("Reporte automatico").Sort.SortFields.Clear
+    ActiveWorkbook.Worksheets("Reporte automatico").Sort.SortFields.Add Key:= _
+        Range(Cells(34, 12), Cells(33 + numclientes, 12)), SortOn:=xlSortOnValues, Order:=xlDescending, DataOption _
+        :=xlSortNormal
+    With ActiveWorkbook.Worksheets("Reporte automatico").Sort
+        .SetRange Range(Cells(33, 11), Cells(33 + numclientes, 13))
+        .Header = xlYes
+        .MatchCase = False
+        .Orientation = xlTopToBottom
+        .SortMethod = xlPinYin
+        .Apply
+    End With
+    
+    Range(Cells(33 + 17, 11), Cells(33 + numclientes, 13)).Select
+    Selection.ClearContents
+
+    Cells(1, 1).Select
+    
+    ' Formato
+    Range("B20").Select
+    Selection.Copy
+    Range("L34:L49").Select
+    Selection.PasteSpecial Paste:=xlPasteFormats, Operation:=xlNone, _
+        SkipBlanks:=False, Transpose:=False
+    Application.CutCopyMode = False
+    Range("M34:M49").Select
+    Selection.Style = "Percent"
+    Range("K32:M49").Select
+    Selection.Borders(xlDiagonalDown).LineStyle = xlNone
+    Selection.Borders(xlDiagonalUp).LineStyle = xlNone
+    With Selection.Borders(xlEdgeLeft)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlThin
+    End With
+    With Selection.Borders(xlEdgeTop)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlThin
+    End With
+    With Selection.Borders(xlEdgeBottom)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlThin
+    End With
+    With Selection.Borders(xlEdgeRight)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlThin
+    End With
+    Range("L34:M49").Select
+    Range("M34").Activate
+    With Selection
+        .HorizontalAlignment = xlCenter
+        .Orientation = 0
+        .AddIndent = False
+        .IndentLevel = 0
+        .ShrinkToFit = False
+        .ReadingOrder = xlContext
+        .MergeCells = False
+    End With
+    
+    Range("L34:L49").Select
+    With Selection.Font
+        .Color = -16776961
+        .TintAndShade = 0
+    End With
+    Range("B19").Select
+    Selection.Copy
+    Range("B34:B49").Select
+    Selection.PasteSpecial Paste:=xlPasteFormats, Operation:=xlNone, _
+        SkipBlanks:=False, Transpose:=False
+    Application.CutCopyMode = False
+    Range("C34:C49").Select
+    Selection.Style = "Percent"
+    Range("B34:B49").Select
+    Selection.Copy
+    Range("D34").Select
+    Selection.PasteSpecial Paste:=xlPasteFormats, Operation:=xlNone, _
+        SkipBlanks:=False, Transpose:=False
+    Application.CutCopyMode = False
+    Selection.Copy
+    Range("E34").Select
+    Selection.PasteSpecial Paste:=xlPasteFormats, Operation:=xlNone, _
+        SkipBlanks:=False, Transpose:=False
+    Application.CutCopyMode = False
+    Selection.Copy
+    Range("F34").Select
+    Selection.PasteSpecial Paste:=xlPasteFormats, Operation:=xlNone, _
+        SkipBlanks:=False, Transpose:=False
+    Application.CutCopyMode = False
+    Range("D32:E49").Select
+    Selection.Borders(xlDiagonalDown).LineStyle = xlNone
+    Selection.Borders(xlDiagonalUp).LineStyle = xlNone
+    With Selection.Borders(xlEdgeLeft)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlThin
+    End With
+    With Selection.Borders(xlEdgeTop)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlThin
+    End With
+    With Selection.Borders(xlEdgeBottom)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlThin
+    End With
+    With Selection.Borders(xlEdgeRight)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlThin
+    End With
+    Selection.Borders(xlInsideVertical).LineStyle = xlNone
+    Range("A32:F49").Select
+    Range("F32").Activate
+    Selection.Borders(xlDiagonalDown).LineStyle = xlNone
+    Selection.Borders(xlDiagonalUp).LineStyle = xlNone
+    With Selection.Borders(xlEdgeLeft)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlThin
+    End With
+    With Selection.Borders(xlEdgeTop)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlThin
+    End With
+    With Selection.Borders(xlEdgeBottom)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlThin
+    End With
+    With Selection.Borders(xlEdgeRight)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlThin
+    End With
+    
+    Sheets("Consecutivo").Select
+    Rows("3:3").Select
+    Selection.AutoFilter
+    
+    Worksheets("Oculta").Visible = False
+        
+    Unload Me
+    
+    Worksheets("Principal").Select
+    
+    
+End Sub
